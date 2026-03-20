@@ -1,13 +1,62 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 
 const app = express();
 const prisma = new PrismaClient();
 
 const port = Number(process.env.API_PORT || 3001);
+const normalizeOrigin = (value) => String(value || '').trim().replace(/\/+$/, '');
+const corsOriginRules = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => normalizeOrigin(origin))
+  .filter(Boolean);
+const allowAllOrigins = corsOriginRules.includes('*');
+
+const matchOriginRule = (origin, rule) => {
+  if (rule === '*') {
+    return true;
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin) {
+    return false;
+  }
+
+  if (!rule.includes('*')) {
+    return normalizedOrigin === rule;
+  }
+
+  const escapedRule = rule.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  return new RegExp(`^${escapedRule}$`).test(normalizedOrigin);
+};
+
+const isOriginAllowed = (origin) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (allowAllOrigins) {
+    return true;
+  }
+
+  return corsOriginRules.some((rule) => matchOriginRule(origin, rule));
+};
 
 app.use(express.json());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} tidak diizinkan oleh CORS`));
+    },
+  }),
+);
 
 const parseNumericId = (value) => {
   const parsed = Number(value);
@@ -26,9 +75,63 @@ const normalizeText = (value) => {
   return value.trim();
 };
 
-const normalizeOptionalText = (value) => {
-  const normalized = normalizeText(value);
-  return normalized.length > 0 ? normalized : null;
+const normalizeStringArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => normalizeText(entry))
+      .filter((entry) => entry.length > 0);
+  }
+
+  const singleValue = normalizeText(value);
+  return singleValue ? [singleValue] : [];
+};
+
+const mapAmalanResponse = (item) => ({
+  id: item.id,
+  judul: item.judul,
+  kategori_nama: item.kategori.nama,
+  isi_arab: item.isi_arab,
+  isi_latin: item.isi_latin,
+  arti: item.arti,
+  jumlah: item.jumlah,
+  waktu: item.waktu,
+  catatan: item.catatan,
+  link_sumber: Array.isArray(item.link_sumber) ? item.link_sumber : [],
+});
+
+const findOrCreateCategoryByName = async (rawName) => {
+  const nama = normalizeText(rawName);
+  if (!nama) {
+    return null;
+  }
+
+  const existing = await prisma.category.findFirst({
+    where: { nama },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return prisma.category.create({
+    data: { nama },
+  });
+};
+
+const resolveCategoryFromPayload = async (payload) => {
+  const kategoriNama = normalizeText(payload?.kategori_nama);
+  if (kategoriNama) {
+    return findOrCreateCategoryByName(kategoriNama);
+  }
+
+  const kategoriId = parseNumericId(payload?.kategori_id);
+  if (!kategoriId) {
+    return null;
+  }
+
+  return prisma.category.findUnique({
+    where: { id: kategoriId },
+  });
 };
 
 app.get('/api/health/db', async (_req, res) => {
@@ -63,14 +166,16 @@ app.post('/api/kategori', async (req, res) => {
   const nama = normalizeText(req.body?.nama);
   const icon = normalizeText(req.body?.icon);
 
-  if (!nama || !icon) {
-    res.status(400).json({ message: 'Nama dan icon kategori wajib diisi' });
+  if (!nama) {
+    res.status(400).json({ message: 'Nama kategori wajib diisi' });
     return;
   }
 
   try {
+    const data = icon ? { nama, icon } : { nama };
+
     const created = await prisma.category.create({
-      data: { nama, icon },
+      data,
     });
 
     res.status(201).json(created);
@@ -92,15 +197,17 @@ app.put('/api/kategori/:id', async (req, res) => {
   const nama = normalizeText(req.body?.nama);
   const icon = normalizeText(req.body?.icon);
 
-  if (!nama || !icon) {
-    res.status(400).json({ message: 'Nama dan icon kategori wajib diisi' });
+  if (!nama) {
+    res.status(400).json({ message: 'Nama kategori wajib diisi' });
     return;
   }
 
   try {
+    const data = icon ? { nama, icon } : { nama };
+
     const updated = await prisma.category.update({
       where: { id },
-      data: { nama, icon },
+      data,
     });
 
     res.json(updated);
@@ -161,19 +268,7 @@ app.get('/api/amalan', async (_req, res) => {
       orderBy: { id: 'asc' },
     });
 
-    res.json(
-      amalan.map((item) => ({
-        id: item.id,
-        judul: item.judul,
-        kategori_id: item.kategori_id,
-        kategori: item.kategori.nama,
-        isi_arab: item.isi_arab,
-        isi_latin: item.isi_latin,
-        arti: item.arti,
-        sumber: item.link_sumber,
-        link_sumber: item.link_sumber,
-      })),
-    );
+    res.json(amalan.map(mapAmalanResponse));
   } catch (error) {
     res.status(500).json({
       message: 'Gagal mengambil data amalan',
@@ -184,21 +279,21 @@ app.get('/api/amalan', async (_req, res) => {
 
 app.post('/api/amalan', async (req, res) => {
   const judul = normalizeText(req.body?.judul);
-  const kategoriId = parseNumericId(req.body?.kategori_id);
   const isiArab = normalizeText(req.body?.isi_arab);
   const isiLatin = normalizeText(req.body?.isi_latin);
   const arti = normalizeText(req.body?.arti);
-  const linkSumber = normalizeOptionalText(req.body?.link_sumber);
+  const jumlah = normalizeText(req.body?.jumlah);
+  const waktu = normalizeText(req.body?.waktu);
+  const catatan = normalizeText(req.body?.catatan);
+  const linkSumber = normalizeStringArray(req.body?.link_sumber);
 
-  if (!judul || !kategoriId || !isiArab || !isiLatin || !arti) {
+  if (!judul || !isiArab || !isiLatin || !arti) {
     res.status(400).json({ message: 'Field wajib amalan belum lengkap' });
     return;
   }
 
   try {
-    const kategori = await prisma.category.findUnique({
-      where: { id: kategoriId },
-    });
+    const kategori = await resolveCategoryFromPayload(req.body);
 
     if (!kategori) {
       res.status(400).json({ message: 'Kategori tidak ditemukan' });
@@ -208,26 +303,19 @@ app.post('/api/amalan', async (req, res) => {
     const created = await prisma.amalan.create({
       data: {
         judul,
-        kategori_id: kategoriId,
+        kategori_id: kategori.id,
         isi_arab: isiArab,
         isi_latin: isiLatin,
         arti,
+        jumlah,
+        waktu,
+        catatan,
         link_sumber: linkSumber,
       },
       include: { kategori: true },
     });
 
-    res.status(201).json({
-      id: created.id,
-      judul: created.judul,
-      kategori_id: created.kategori_id,
-      kategori: created.kategori.nama,
-      isi_arab: created.isi_arab,
-      isi_latin: created.isi_latin,
-      arti: created.arti,
-      sumber: created.link_sumber,
-      link_sumber: created.link_sumber,
-    });
+    res.status(201).json(mapAmalanResponse(created));
   } catch (error) {
     res.status(500).json({
       message: 'Gagal menambah amalan',
@@ -254,17 +342,7 @@ app.get('/api/amalan/:id', async (req, res) => {
       return;
     }
 
-    res.json({
-      id: item.id,
-      judul: item.judul,
-      kategori_id: item.kategori_id,
-      kategori: item.kategori.nama,
-      isi_arab: item.isi_arab,
-      isi_latin: item.isi_latin,
-      arti: item.arti,
-      link_sumber: item.link_sumber,
-      sumber: item.link_sumber,
-    });
+    res.json(mapAmalanResponse(item));
   } catch (error) {
     res.status(500).json({
       message: 'Gagal mengambil detail amalan',
@@ -281,21 +359,21 @@ app.put('/api/amalan/:id', async (req, res) => {
   }
 
   const judul = normalizeText(req.body?.judul);
-  const kategoriId = parseNumericId(req.body?.kategori_id);
   const isiArab = normalizeText(req.body?.isi_arab);
   const isiLatin = normalizeText(req.body?.isi_latin);
   const arti = normalizeText(req.body?.arti);
-  const linkSumber = normalizeOptionalText(req.body?.link_sumber);
+  const jumlah = normalizeText(req.body?.jumlah);
+  const waktu = normalizeText(req.body?.waktu);
+  const catatan = normalizeText(req.body?.catatan);
+  const linkSumber = normalizeStringArray(req.body?.link_sumber);
 
-  if (!judul || !kategoriId || !isiArab || !isiLatin || !arti) {
+  if (!judul || !isiArab || !isiLatin || !arti) {
     res.status(400).json({ message: 'Field wajib amalan belum lengkap' });
     return;
   }
 
   try {
-    const kategori = await prisma.category.findUnique({
-      where: { id: kategoriId },
-    });
+    const kategori = await resolveCategoryFromPayload(req.body);
 
     if (!kategori) {
       res.status(400).json({ message: 'Kategori tidak ditemukan' });
@@ -306,26 +384,19 @@ app.put('/api/amalan/:id', async (req, res) => {
       where: { id },
       data: {
         judul,
-        kategori_id: kategoriId,
+        kategori_id: kategori.id,
         isi_arab: isiArab,
         isi_latin: isiLatin,
         arti,
+        jumlah,
+        waktu,
+        catatan,
         link_sumber: linkSumber,
       },
       include: { kategori: true },
     });
 
-    res.json({
-      id: updated.id,
-      judul: updated.judul,
-      kategori_id: updated.kategori_id,
-      kategori: updated.kategori.nama,
-      isi_arab: updated.isi_arab,
-      isi_latin: updated.isi_latin,
-      arti: updated.arti,
-      sumber: updated.link_sumber,
-      link_sumber: updated.link_sumber,
-    });
+    res.json(mapAmalanResponse(updated));
   } catch (error) {
     if (error?.code === 'P2025') {
       res.status(404).json({ message: 'Amalan tidak ditemukan' });

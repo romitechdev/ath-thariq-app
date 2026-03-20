@@ -43,6 +43,11 @@ DB_NAME="jalur_langit"
 DATABASE_URL="postgresql://postgres:postgres@localhost:55432/jalur_langit?schema=public"
 
 API_PORT="3001"
+CORS_ORIGIN="http://localhost:5173"
+
+# Opsional (untuk frontend production, mis. Vercel)
+# VITE_API_BASE_URL="https://api.domain-anda.com"
+
 ADMIN_USERNAME="admin"
 ADMIN_PASSWORD="ganti-password-aman"
 ```
@@ -110,7 +115,10 @@ Struktur wajib:
       "isi_arab": "...",
       "isi_latin": "...",
       "arti": "...",
-      "link_sumber": "..."
+      "jumlah": "100x",
+      "waktu": "Pagi",
+      "catatan": "Dibaca setelah Subuh",
+      "link_sumber": ["https://..."]
     }
   ]
 }
@@ -134,6 +142,10 @@ npm run db:import:reset
 
 - `npm run dev` → jalankan frontend Vite di port `5173`.
 - `npm run dev:server` → jalankan backend Express API.
+- `npm run start:server` → jalankan backend mode production.
+- `npm start` → alias ke `npm run start:server`.
+- `npm run tunnel:quick` → buka quick tunnel ke frontend lokal (`5173`).
+- `npm run dev:quick` → jalankan backend + frontend + quick tunnel sekaligus (1 perintah).
 - `npm run prisma:generate` → generate Prisma Client.
 - `npm run db:push` → sinkron schema Prisma ke database.
 - `npm run db:seed` → isi data dummy bawaan.
@@ -172,11 +184,90 @@ npm run db:import:reset
 
 Jika aplikasi dijalankan di server lab dan ingin dibuka publik tanpa deploy:
 
+### Cara paling cepat (1 perintah)
+
 ```bash
-cloudflared tunnel --config /dev/null --url http://localhost:5173 --http-host-header localhost --no-autoupdate
+npm run dev:quick
+```
+
+Script ini akan:
+- Menjalankan backend (`3001`)
+- Menjalankan frontend (`5173`)
+- Membuka quick tunnel ke frontend
+
+### Manual (jika ingin terpisah)
+
+```bash
+cloudflared tunnel --config /dev/null --origincert /dev/null --url http://localhost:5173 --http-host-header localhost --no-autoupdate
 ```
 
 Catatan: URL `trycloudflare.com` berubah setiap restart tunnel.
+Jika pakai `npm run dev:quick`, log tunnel disimpan ke `/tmp/quick-tunnel.log`.
+Log `ERR Configuration file /dev/null was empty` bisa diabaikan (tunnel tetap berjalan).
+
+## Deploy Frontend Vercel + Backend Server Lab
+
+### 1) Siapkan backend di server lab
+
+```bash
+npm ci
+npm run prisma:generate
+npm run db:push
+```
+
+Set `.env` backend (contoh production):
+
+```dotenv
+NODE_ENV="production"
+API_PORT="3001"
+
+# domain frontend yang diizinkan mengakses API
+CORS_ORIGIN="https://nama-project.vercel.app,https://*.vercel.app"
+
+ADMIN_USERNAME="admin"
+ADMIN_PASSWORD="ganti-password-aman"
+DATABASE_URL="postgresql://user:password@host:5432/jalur_langit?schema=public"
+```
+
+Jalankan backend dengan PM2:
+
+```bash
+npm install -g pm2
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup
+```
+
+Verifikasi backend:
+
+```bash
+curl http://localhost:3001/api/health/db
+```
+
+### 2) Publikasikan backend dengan Nginx + HTTPS
+
+Gunakan contoh config di `deploy/nginx-ath-thariq-api.conf.example` lalu aktifkan di Nginx.
+
+Setelah domain API mengarah ke server, pasang SSL:
+
+```bash
+sudo certbot --nginx -d api.domain-anda.com
+```
+
+### 3) Deploy frontend ke Vercel
+
+- Import repository ke Vercel.
+- Build command: `npm run build`.
+- Output directory: `dist`.
+- Tambahkan env Vercel:
+
+```dotenv
+VITE_API_BASE_URL="https://api.domain-anda.com"
+```
+
+Routing SPA sudah disiapkan lewat `vercel.json`, jadi refresh di route seperti `/favorit` atau `/admin/dashboard` tidak 404.
+
+Catatan: jika `VITE_API_BASE_URL` dikosongkan, frontend akan fallback ke path relatif `/api` (cocok untuk dev lokal, tidak disarankan untuk deploy split-host).
 
 ## Troubleshooting Singkat
 

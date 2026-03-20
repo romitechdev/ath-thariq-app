@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Button } from '@wearesyntesa/karbit-ui/react';
 import { LogIn, ShieldCheck } from 'lucide-react';
+import { createApiUrl } from '../../utils/api';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('');
@@ -12,7 +13,7 @@ export default function AdminLogin() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/admin/login', {
+      const response = await fetch(createApiUrl('/api/admin/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

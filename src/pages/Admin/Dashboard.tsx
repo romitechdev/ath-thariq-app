@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Badge } from '@wearesyntesa/karbit-ui/react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { createApiUrl } from '../../utils/api';
 
 type CategoryItem = {
   id: number;
@@ -11,12 +12,14 @@ type CategoryItem = {
 type AmalanAdminItem = {
   id: number;
   judul: string;
-  kategori_id: number;
-  kategori: string;
+  kategori_nama: string;
   isi_arab: string;
   isi_latin: string;
   arti: string;
-  link_sumber?: string | null;
+  jumlah: string;
+  waktu: string;
+  catatan: string;
+  link_sumber: string[];
 };
 
 type CategoryForm = {
@@ -26,10 +29,13 @@ type CategoryForm = {
 
 type AmalanForm = {
   judul: string;
-  kategori_id: string;
+  kategori_nama: string;
   isi_arab: string;
   isi_latin: string;
   arti: string;
+  jumlah: string;
+  waktu: string;
+  catatan: string;
   link_sumber: string;
 };
 
@@ -55,10 +61,13 @@ export default function AdminDashboard() {
   const [editingAmalanId, setEditingAmalanId] = useState<number | null>(null);
   const [amalanForm, setAmalanForm] = useState<AmalanForm>({
     judul: '',
-    kategori_id: '',
+    kategori_nama: '',
     isi_arab: '',
     isi_latin: '',
     arti: '',
+    jumlah: '',
+    waktu: '',
+    catatan: '',
     link_sumber: '',
   });
   const [amalanFormError, setAmalanFormError] = useState('');
@@ -74,7 +83,7 @@ export default function AdminDashboard() {
   };
 
   const fetchJson = async <T,>(url: string): Promise<T> => {
-    const response = await fetch(url);
+    const response = await fetch(createApiUrl(url));
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
@@ -89,7 +98,7 @@ export default function AdminDashboard() {
     method: 'POST' | 'PUT' | 'DELETE',
     body?: Record<string, unknown>,
   ): Promise<T> => {
-    const response = await fetch(url, {
+    const response = await fetch(createApiUrl(url), {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -173,19 +182,17 @@ export default function AdminDashboard() {
   };
 
   const openAddAmalanModal = () => {
-    if (categories.length === 0) {
-      setErrorMessage('Belum ada kategori. Tambahkan kategori terlebih dahulu.');
-      return;
-    }
-
     setAmalanModalMode('create');
     setEditingAmalanId(null);
     setAmalanForm({
       judul: '',
-      kategori_id: String(categories[0].id),
+      kategori_nama: categories[0]?.nama || '',
       isi_arab: '',
       isi_latin: '',
       arti: '',
+      jumlah: '',
+      waktu: '',
+      catatan: '',
       link_sumber: '',
     });
     setAmalanFormError('');
@@ -197,11 +204,14 @@ export default function AdminDashboard() {
     setEditingAmalanId(item.id);
     setAmalanForm({
       judul: item.judul,
-      kategori_id: String(item.kategori_id),
+      kategori_nama: item.kategori_nama,
       isi_arab: item.isi_arab,
       isi_latin: item.isi_latin,
       arti: item.arti,
-      link_sumber: item.link_sumber || '',
+      jumlah: item.jumlah || '',
+      waktu: item.waktu || '',
+      catatan: item.catatan || '',
+      link_sumber: Array.isArray(item.link_sumber) ? item.link_sumber.join('\n') : '',
     });
     setAmalanFormError('');
     setIsAmalanModalOpen(true);
@@ -261,21 +271,25 @@ export default function AdminDashboard() {
     e.preventDefault();
 
     const judul = amalanForm.judul.trim();
+    const kategori_nama = amalanForm.kategori_nama.trim();
     const isi_arab = amalanForm.isi_arab.trim();
     const isi_latin = amalanForm.isi_latin.trim();
     const arti = amalanForm.arti.trim();
-    const link_sumber = amalanForm.link_sumber.trim();
-    const kategoriId = Number(amalanForm.kategori_id);
+    const jumlah = amalanForm.jumlah.trim();
+    const waktu = amalanForm.waktu.trim();
+    const catatan = amalanForm.catatan.trim();
+    const link_sumber = amalanForm.link_sumber
+      .split('\n')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
 
-    const kategoriExists = categories.some((item) => item.id === kategoriId);
-
-    if (!judul || !isi_arab || !isi_latin || !arti) {
-      setAmalanFormError('Judul, isi arab, isi latin, dan arti wajib diisi.');
+    if (!judul || !kategori_nama || !isi_arab || !isi_latin || !arti) {
+      setAmalanFormError('Judul, kategori, isi arab, isi latin, dan arti wajib diisi.');
       return;
     }
 
-    if (!Number.isInteger(kategoriId) || !kategoriExists) {
-      setAmalanFormError('Kategori wajib dipilih dengan benar.');
+    if (!jumlah || !waktu) {
+      setAmalanFormError('Jumlah dan waktu wajib diisi.');
       return;
     }
 
@@ -286,10 +300,13 @@ export default function AdminDashboard() {
         if (amalanModalMode === 'create') {
           await mutateJson('/api/amalan', 'POST', {
             judul,
-            kategori_id: kategoriId,
+            kategori_nama,
             isi_arab,
             isi_latin,
             arti,
+            jumlah,
+            waktu,
+            catatan,
             link_sumber,
           });
           return;
@@ -301,10 +318,13 @@ export default function AdminDashboard() {
 
         await mutateJson(`/api/amalan/${editingAmalanId}`, 'PUT', {
           judul,
-          kategori_id: kategoriId,
+          kategori_nama,
           isi_arab,
           isi_latin,
           arti,
+          jumlah,
+          waktu,
+          catatan,
           link_sumber,
         });
       },
@@ -402,7 +422,7 @@ export default function AdminDashboard() {
                         <td className="p-4 text-sm">{item.id}</td>
                         <td className="p-4 font-medium">{item.judul}</td>
                         <td className="p-4">
-                          <Badge variant="subtle">{item.kategori}</Badge>
+                          <Badge variant="subtle">{item.kategori_nama}</Badge>
                         </td>
                         <td className="p-4 flex gap-2">
                           <Button onClick={() => openEditAmalanModal(item)} disabled={isBusy} variant="outline" size="sm" className="h-8 w-8">
@@ -534,21 +554,22 @@ export default function AdminDashboard() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Kategori</label>
-                <select
-                  value={amalanForm.kategori_id}
-                  onChange={(e) => setAmalanForm((prev) => ({ ...prev, kategori_id: e.target.value }))}
+                <input
+                  type="text"
+                  list="kategori-options"
+                  value={amalanForm.kategori_nama}
+                  onChange={(e) => setAmalanForm((prev) => ({ ...prev, kategori_nama: e.target.value }))}
                   className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                  placeholder="Contoh: Harian"
                   required
-                >
-                  <option value="" disabled>
-                    Pilih kategori
-                  </option>
+                />
+                <datalist id="kategori-options">
                   {categories.map((item) => (
-                    <option key={item.id} value={item.id}>
+                    <option key={item.id} value={item.nama}>
                       {item.nama}
                     </option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div className="space-y-2">
@@ -582,12 +603,46 @@ export default function AdminDashboard() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Sumber / Link (opsional)</label>
+                <label className="text-sm font-medium">Jumlah</label>
                 <input
                   type="text"
+                  value={amalanForm.jumlah}
+                  onChange={(e) => setAmalanForm((prev) => ({ ...prev, jumlah: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                  placeholder="Contoh: 33x"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Waktu</label>
+                <input
+                  type="text"
+                  value={amalanForm.waktu}
+                  onChange={(e) => setAmalanForm((prev) => ({ ...prev, waktu: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                  placeholder="Contoh: Setelah Subuh"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Catatan</label>
+                <textarea
+                  value={amalanForm.catatan}
+                  onChange={(e) => setAmalanForm((prev) => ({ ...prev, catatan: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all min-h-20"
+                  placeholder="Catatan tambahan (opsional)"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Link Sumber (satu link per baris)</label>
+                <textarea
                   value={amalanForm.link_sumber}
                   onChange={(e) => setAmalanForm((prev) => ({ ...prev, link_sumber: e.target.value }))}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all min-h-24"
+                  placeholder="https://contoh1.com&#10;https://contoh2.com"
                 />
               </div>
 

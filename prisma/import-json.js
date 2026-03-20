@@ -25,6 +25,27 @@ const readJsonFile = () => {
   }
 };
 
+const extractAmalanList = (payload) => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.amalan)) {
+    return payload.amalan;
+  }
+
+  if (payload && typeof payload === 'object') {
+    const requiredKeys = ['judul', 'kategori_nama', 'isi_arab', 'isi_latin', 'arti', 'jumlah', 'waktu', 'catatan', 'link_sumber'];
+    const isSingleItem = requiredKeys.every((key) => Object.prototype.hasOwnProperty.call(payload, key));
+
+    if (isSingleItem) {
+      return [payload];
+    }
+  }
+
+  throw new Error('Format JSON tidak valid. Gunakan object tunggal amalan, array amalan, atau object dengan key amalan (array).');
+};
+
 const requiredText = (value, fieldName) => {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`Field ${fieldName} wajib diisi`);
@@ -35,23 +56,64 @@ const requiredText = (value, fieldName) => {
 
 const optionalText = (value) => {
   if (typeof value !== 'string') {
-    return null;
+    return '';
   }
 
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return trimmed.length > 0 ? trimmed : '';
+};
+
+const normalizeLinks = (value, fieldName) => {
+  if (value == null) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((entry, index) => {
+        if (typeof entry !== 'string') {
+          throw new Error(`Field ${fieldName}[${index}] harus string`);
+        }
+
+        return entry.trim();
+      })
+      .filter((entry) => entry.length > 0);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  throw new Error(`Field ${fieldName} harus array of string`);
+};
+
+const findOrCreateCategory = async (nama, cache) => {
+  if (cache.has(nama)) {
+    return { id: cache.get(nama), created: false };
+  }
+
+  const existing = await prisma.category.findFirst({
+    where: { nama },
+  });
+
+  if (existing) {
+    cache.set(nama, existing.id);
+    return { id: existing.id, created: false };
+  }
+
+  const created = await prisma.category.create({
+    data: { nama },
+  });
+
+  cache.set(nama, created.id);
+  return { id: created.id, created: true };
 };
 
 const run = async () => {
   const payload = readJsonFile();
-
-  if (!Array.isArray(payload.kategori)) {
-    throw new Error('Field kategori harus berupa array');
-  }
-
-  if (!Array.isArray(payload.amalan)) {
-    throw new Error('Field amalan harus berupa array');
-  }
+  const amalanList = extractAmalanList(payload);
+  const kategoriList = Array.isArray(payload?.kategori) ? payload.kategori : [];
 
   if (shouldReset) {
     await prisma.$transaction([
@@ -64,26 +126,29 @@ const run = async () => {
   let createdKategori = 0;
   let updatedKategori = 0;
 
-  for (const [index, item] of payload.kategori.entries()) {
+  for (const [index, item] of kategoriList.entries()) {
     const nama = requiredText(item?.nama, `kategori[${index}].nama`);
-    const icon = requiredText(item?.icon, `kategori[${index}].icon`);
+    const icon = optionalText(item?.icon);
 
     const existing = await prisma.category.findFirst({
       where: { nama },
     });
 
     if (existing) {
-      await prisma.category.update({
-        where: { id: existing.id },
-        data: { icon },
-      });
+      if (icon) {
+        await prisma.category.update({
+          where: { id: existing.id },
+          data: { icon },
+        });
+        updatedKategori += 1;
+      }
+
       categoryMap.set(nama, existing.id);
-      updatedKategori += 1;
       continue;
     }
 
     const created = await prisma.category.create({
-      data: { nama, icon },
+      data: icon ? { nama, icon } : { nama },
     });
 
     categoryMap.set(nama, created.id);
@@ -93,29 +158,20 @@ const run = async () => {
   let createdAmalan = 0;
   let updatedAmalan = 0;
 
-  for (const [index, item] of payload.amalan.entries()) {
+  for (const [index, item] of amalanList.entries()) {
     const judul = requiredText(item?.judul, `amalan[${index}].judul`);
     const kategoriNama = requiredText(item?.kategori_nama, `amalan[${index}].kategori_nama`);
     const isiArab = requiredText(item?.isi_arab, `amalan[${index}].isi_arab`);
     const isiLatin = requiredText(item?.isi_latin, `amalan[${index}].isi_latin`);
     const arti = requiredText(item?.arti, `amalan[${index}].arti`);
-    const linkSumber = optionalText(item?.link_sumber);
+    const jumlah = optionalText(item?.jumlah);
+    const waktu = optionalText(item?.waktu);
+    const catatan = optionalText(item?.catatan);
+    const linkSumber = normalizeLinks(item?.link_sumber, `amalan[${index}].link_sumber`);
 
-    let kategoriId = categoryMap.get(kategoriNama);
-
-    if (!kategoriId) {
-      const existingCategory = await prisma.category.findFirst({
-        where: { nama: kategoriNama },
-      });
-
-      if (!existingCategory) {
-        throw new Error(
-          `Kategori '${kategoriNama}' pada amalan[${index}] tidak ditemukan. Pastikan kategori ada di array kategori atau database.`,
-        );
-      }
-
-      kategoriId = existingCategory.id;
-      categoryMap.set(kategoriNama, kategoriId);
+    const { id: kategoriId, created: categoryCreated } = await findOrCreateCategory(kategoriNama, categoryMap);
+    if (categoryCreated) {
+      createdKategori += 1;
     }
 
     const existing = await prisma.amalan.findFirst({
@@ -134,6 +190,9 @@ const run = async () => {
           isi_arab: isiArab,
           isi_latin: isiLatin,
           arti,
+          jumlah,
+          waktu,
+          catatan,
           link_sumber: linkSumber,
         },
       });
@@ -148,6 +207,9 @@ const run = async () => {
         isi_arab: isiArab,
         isi_latin: isiLatin,
         arti,
+        jumlah,
+        waktu,
+        catatan,
         link_sumber: linkSumber,
       },
     });

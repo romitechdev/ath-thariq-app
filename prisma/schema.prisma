@@ -13,7 +13,7 @@ datasource db {
 model Category {
   id      Int      @id @default(autoincrement())
   nama    String
-  icon    String
+  icon    String   @default("📚")
   amalans Amalan[]
 }
 
@@ -25,6 +25,9 @@ model Amalan {
   isi_arab    String   @db.Text
   isi_latin   String   @db.Text
   arti        String   @db.Text
-  link_sumber String?
+  jumlah      String   @default("")
+  waktu       String   @default("")
+  catatan     String   @default("")
+  link_sumber String[] @default([])
   createdAt   DateTime @default(now())
 }
