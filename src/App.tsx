@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import Detail from './pages/Detail';
 import Favorites from './pages/Favorites';
@@ -8,6 +8,73 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import KarbitRegistrar from './components/KarbitRegistrar';
 import { Moon, Sun, Heart, LayoutDashboard } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+const APP_URL = 'https://ath-thariq-app.vercel.app';
+
+function SeoManager() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const routeMap: Record<string, { title: string; description: string }> = {
+      '/': {
+        title: 'Jalur Langit - Amalan Harian Islami',
+        description:
+          'Temukan amalan harian Islami lengkap dengan teks Arab, latin, arti, dan sumber terpercaya.',
+      },
+      '/favorit': {
+        title: 'Favorit - Jalur Langit',
+        description: 'Lihat dan kelola daftar amalan favorit Anda di Jalur Langit.',
+      },
+      '/admin': {
+        title: 'Admin Login - Jalur Langit',
+        description: 'Halaman login admin untuk mengelola konten amalan dan kategori.',
+      },
+      '/admin/dashboard': {
+        title: 'Dashboard Admin - Jalur Langit',
+        description: 'Dashboard admin untuk manajemen data amalan dan kategori.',
+      },
+    };
+
+    const isDetailRoute = location.pathname.startsWith('/amalan/');
+    const fallback = {
+      title: 'Jalur Langit - Amalan Harian Islami',
+      description:
+        'Platform amalan Islami harian dengan bacaan Arab, latin, arti, dan sumber terpercaya.',
+    };
+
+    const meta = isDetailRoute
+      ? {
+          title: 'Detail Amalan - Jalur Langit',
+          description: 'Baca detail amalan Islami lengkap dengan bacaan dan sumber.',
+        }
+      : routeMap[location.pathname] || fallback;
+
+    const fullUrl = `${APP_URL}${location.pathname}${location.search}`;
+
+    document.title = meta.title;
+
+    const setMeta = (selector: string, value: string) => {
+      const element = document.querySelector(selector);
+      if (element) {
+        element.setAttribute('content', value);
+      }
+    };
+
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) {
+      canonical.setAttribute('href', fullUrl);
+    }
+
+    setMeta('meta[name="description"]', meta.description);
+    setMeta('meta[property="og:title"]', meta.title);
+    setMeta('meta[property="og:description"]', meta.description);
+    setMeta('meta[property="og:url"]', fullUrl);
+    setMeta('meta[name="twitter:title"]', meta.title);
+    setMeta('meta[name="twitter:description"]', meta.description);
+  }, [location.pathname, location.search]);
+
+  return null;
+}
 
 export default function App() {
   const [isDark, setIsDark] = useState(false);
@@ -22,6 +89,7 @@ export default function App() {
 
   return (
     <Router>
+      <SeoManager />
       <div className="min-h-screen transition-colors duration-300 bg-background text-foreground">
         <KarbitRegistrar />
         
