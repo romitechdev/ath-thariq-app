@@ -1,0 +1,30 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id      Int      @id @default(autoincrement())
+  nama    String
+  icon    String
+  amalans Amalan[]
+}
+
+model Amalan {
+  id          Int      @id @default(autoincrement())
+  judul       String
+  kategori_id Int
+  kategori    Category @relation(fields: [kategori_id], references: [id])
+  isi_arab    String   @db.Text
+  isi_latin   String   @db.Text
+  arti        String   @db.Text
+  link_sumber String?
+  createdAt   DateTime @default(now())
+}
