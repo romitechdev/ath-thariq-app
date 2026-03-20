@@ -2,38 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge } from '@wearesyntesa/karbit-ui/react';
 import { Heart, Search, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-// Mock data for demonstration since we don't have a live DB connection in this turn
-const MOCK_AMALAN = [
-  {
-    id: 1,
-    judul: 'Dzikir Pagi',
-    kategori: 'Harian',
-    isi_latin: 'Subhanallahi wa bihamdihi...',
-    arti: 'Maha Suci Allah dan segala puji bagi-Nya...',
-  },
-  {
-    id: 2,
-    judul: 'Ayat Kursi',
-    kategori: 'Perlindungan',
-    isi_latin: 'Allahu la ilaha illa huwal hayyul qayyum...',
-    arti: 'Allah, tidak ada Tuhan melainkan Dia yang Hidup kekal...',
-  },
-  {
-    id: 3,
-    judul: 'Doa Sebelum Tidur',
-    kategori: 'Harian',
-    isi_latin: 'Bismika Allahumma ahya wa amut...',
-    arti: 'Dengan nama-Mu ya Allah aku hidup dan aku mati...',
-  },
-];
+import { MOCK_AMALAN } from '../data/mockAmalan';
+import type { AmalanItem } from '../types/amalan';
 
 export default function Home() {
   const [favorites, setFavorites] = useState<number[]>([]);
+  const [amalanList, setAmalanList] = useState<AmalanItem[]>(MOCK_AMALAN);
 
   useEffect(() => {
     const saved = localStorage.getItem('favorites');
     if (saved) setFavorites(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAmalan = async () => {
+      try {
+        const response = await fetch('/api/amalan');
+        if (!response.ok) return;
+
+        const data = (await response.json()) as AmalanItem[];
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setAmalanList(data);
+        }
+      } catch {
+        // Use mock data fallback
+      }
+    };
+
+    loadAmalan();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const toggleFavorite = (id: number) => {
@@ -71,7 +73,7 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {MOCK_AMALAN.map((item) => (
+        {amalanList.map((item) => (
           <Card key={item.id} className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">

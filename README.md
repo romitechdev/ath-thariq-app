@@ -12,9 +12,32 @@ View your app in AI Studio: https://ai.studio/apps/b0ad60cb-bc30-4946-aeff-bb059
 
 **Prerequisites:**  Node.js
 
-
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Copy env example:
+   `cp .env.example .env`
+3. Isi nilai env berikut di `.env`:
+   - `GEMINI_API_KEY`
+   - `ADMIN_USERNAME`
+   - `ADMIN_PASSWORD`
+4. Jalankan PostgreSQL via Docker:
+   `docker compose up -d db`
+5. Generate Prisma client dan sinkronkan schema ke DB:
+   `npm run prisma:generate && npm run db:push`
+6. Isi data dummy awal (opsional):
+   `npm run db:seed`
+   Jika ingin reset data lama lalu isi ulang dummy:
+   `npm run db:seed:reset`
+7. Jalankan API server (terminal 1):
+   `npm run dev:server`
+8. Jalankan frontend Vite (terminal 2):
    `npm run dev`
+
+## Endpoint penting
+
+- Health check database: `GET /api/health/db`
+- Admin login: `POST /api/admin/login`
+- Kategori: `GET /api/kategori`, `POST /api/kategori`, `PUT /api/kategori/:id`, `DELETE /api/kategori/:id`
+- Amalan: `GET /api/amalan`, `GET /api/amalan/:id`, `POST /api/amalan`, `PUT /api/amalan/:id`, `DELETE /api/amalan/:id`
+
+Admin login sekarang divalidasi di backend menggunakan `ADMIN_USERNAME` dan `ADMIN_PASSWORD` dari env (bukan hardcoded di frontend).

@@ -3,16 +3,34 @@ import { Card, Button } from '@wearesyntesa/karbit-ui/react';
 import { LogIn, ShieldCheck } from 'lucide-react';
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple mock login
-    if (email === 'admin@jalurlangit.com' && password === 'admin123') {
-      window.location.href = '/admin/dashboard';
-    } else {
-      alert('Login gagal. Gunakan admin@jalurlangit.com / admin123');
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (response.ok) {
+        window.location.href = '/admin/dashboard';
+        return;
+      }
+
+      const payload = await response.json().catch(() => null);
+      alert(payload?.message || 'Login gagal. Periksa username dan password.');
+    } catch {
+      alert('Tidak dapat terhubung ke server. Pastikan API server berjalan.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -29,12 +47,12 @@ export default function AdminLogin() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
+            <label className="text-sm font-medium">Username</label>
             <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@jalurlangit.com"
+              type="text" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Masukkan username"
               className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
               required
             />
@@ -51,9 +69,9 @@ export default function AdminLogin() {
             />
           </div>
 
-          <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 rounded-xl gap-2">
+          <Button type="submit" disabled={isLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 rounded-xl gap-2 disabled:opacity-70">
             <LogIn className="w-5 h-5" />
-            Masuk ke Dashboard
+            {isLoading ? 'Memproses...' : 'Masuk ke Dashboard'}
           </Button>
         </form>
       </Card>

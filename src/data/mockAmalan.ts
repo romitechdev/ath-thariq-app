@@ -1,0 +1,32 @@
+import type { AmalanItem } from '../types/amalan';
+
+export const MOCK_AMALAN: AmalanItem[] = [
+  {
+    id: 1,
+    judul: 'Dzikir Pagi',
+    kategori: 'Harian',
+    isi_arab: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ: عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ',
+    isi_latin: 'Subhanallahi wa bihamdihi: adada khalqihi, wa ridha nafsihi, wa zinata arshihi, wa midada kalimatihi',
+    arti: 'Maha Suci Allah dan segala puji bagi-Nya, sebanyak bilangan makhluk-Nya, sesuai keridhaan diri-Nya, seberat timbangan Arsy-Nya, dan sebanyak tinta kalimat-kalimat-Nya.',
+    sumber: 'HR. Muslim no. 2726',
+    link_sumber: 'HR. Muslim no. 2726',
+  },
+  {
+    id: 2,
+    judul: 'Ayat Kursi',
+    kategori: 'Perlindungan',
+    isi_latin: 'Allahu la ilaha illa huwal hayyul qayyum...',
+    arti: 'Allah, tidak ada Tuhan melainkan Dia yang Hidup kekal...',
+    sumber: 'QS. Al-Baqarah: 255',
+    link_sumber: 'QS. Al-Baqarah: 255',
+  },
+  {
+    id: 3,
+    judul: 'Doa Sebelum Tidur',
+    kategori: 'Harian',
+    isi_latin: 'Bismika Allahumma ahya wa amut...',
+    arti: 'Dengan nama-Mu ya Allah aku hidup dan aku mati...',
+    sumber: 'HR. Bukhari no. 6324',
+    link_sumber: 'HR. Bukhari no. 6324',
+  },
+];

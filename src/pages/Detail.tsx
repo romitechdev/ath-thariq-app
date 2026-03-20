@@ -2,24 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button, Card, Badge } from '@wearesyntesa/karbit-ui/react';
 import { ArrowLeft, Heart, Share2, Bookmark } from 'lucide-react';
-
-// Mock data
-const MOCK_AMALAN = [
-  {
-    id: 1,
-    judul: 'Dzikir Pagi',
-    kategori: 'Harian',
-    isi_arab: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ: عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ',
-    isi_latin: 'Subhanallahi wa bihamdihi: adada khalqihi, wa ridha nafsihi, wa zinata arshihi, wa midada kalimatihi',
-    arti: 'Maha Suci Allah dan segala puji bagi-Nya, sebanyak bilangan makhluk-Nya, sesuai keridhaan diri-Nya, seberat timbangan Arsy-Nya, dan sebanyak tinta kalimat-kalimat-Nya.',
-    sumber: 'HR. Muslim no. 2726'
-  }
-];
+import { MOCK_AMALAN } from '../data/mockAmalan';
+import type { AmalanItem } from '../types/amalan';
 
 export default function Detail() {
   const { id } = useParams();
+  const idNumber = Number(id);
+  const fallbackItem = MOCK_AMALAN.find((amalan) => amalan.id === idNumber) || MOCK_AMALAN[0];
+
   const [isFavorite, setIsFavorite] = useState(false);
-  const item = MOCK_AMALAN.find(a => a.id === Number(id)) || MOCK_AMALAN[0];
+  const [item, setItem] = useState<AmalanItem>(fallbackItem);
+
+  useEffect(() => {
+    setItem(fallbackItem);
+  }, [fallbackItem]);
+
+  useEffect(() => {
+    if (Number.isNaN(idNumber)) return;
+
+    let isMounted = true;
+
+    const loadDetail = async () => {
+      try {
+        const response = await fetch(`/api/amalan/${idNumber}`);
+        if (!response.ok) return;
+
+        const data = (await response.json()) as AmalanItem;
+        if (isMounted) {
+          setItem(data);
+        }
+      } catch {
+        // Use mock fallback
+      }
+    };
+
+    loadDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [idNumber]);
 
   useEffect(() => {
     const saved = localStorage.getItem('favorites');

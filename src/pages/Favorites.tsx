@@ -2,41 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge } from '@wearesyntesa/karbit-ui/react';
 import { Heart, BookOpen, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-// Mock data
-const MOCK_AMALAN = [
-  {
-    id: 1,
-    judul: 'Dzikir Pagi',
-    kategori: 'Harian',
-    isi_latin: 'Subhanallahi wa bihamdihi...',
-    arti: 'Maha Suci Allah dan segala puji bagi-Nya...',
-  },
-  {
-    id: 2,
-    judul: 'Ayat Kursi',
-    kategori: 'Perlindungan',
-    isi_latin: 'Allahu la ilaha illa huwal hayyul qayyum...',
-    arti: 'Allah, tidak ada Tuhan melainkan Dia yang Hidup kekal...',
-  },
-  {
-    id: 3,
-    judul: 'Doa Sebelum Tidur',
-    kategori: 'Harian',
-    isi_latin: 'Bismika Allahumma ahya wa amut...',
-    arti: 'Dengan nama-Mu ya Allah aku hidup dan aku mati...',
-  },
-];
+import { MOCK_AMALAN } from '../data/mockAmalan';
+import type { AmalanItem } from '../types/amalan';
 
 export default function Favorites() {
   const [favorites, setFavorites] = useState<number[]>([]);
+  const [amalanList, setAmalanList] = useState<AmalanItem[]>(MOCK_AMALAN);
 
   useEffect(() => {
     const saved = localStorage.getItem('favorites');
     if (saved) setFavorites(JSON.parse(saved));
   }, []);
 
-  const favoriteItems = MOCK_AMALAN.filter(item => favorites.includes(item.id));
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAmalan = async () => {
+      try {
+        const response = await fetch('/api/amalan');
+        if (!response.ok) return;
+
+        const data = (await response.json()) as AmalanItem[];
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setAmalanList(data);
+        }
+      } catch {
+        // Use mock data fallback
+      }
+    };
+
+    loadAmalan();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const favoriteItems = amalanList.filter(item => favorites.includes(item.id));
 
   const removeFavorite = (id: number) => {
     const newFavorites = favorites.filter(favId => favId !== id);
