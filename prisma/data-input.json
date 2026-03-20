@@ -1,0 +1,30 @@
+{
+  "kategori": [
+    {
+      "nama": "Harian",
+      "icon": "📿"
+    },
+    {
+      "nama": "Perlindungan",
+      "icon": "🛡️"
+    }
+  ],
+  "amalan": [
+    {
+      "judul": "Dzikir Pagi",
+      "kategori_nama": "Harian",
+      "isi_arab": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ",
+      "isi_latin": "Subhanallahi wa bihamdihi",
+      "arti": "Maha Suci Allah dan segala puji bagi-Nya.",
+      "link_sumber": "HR. Muslim no. 2691"
+    },
+    {
+      "judul": "Ayat Kursi",
+      "kategori_nama": "Perlindungan",
+      "isi_arab": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ",
+      "isi_latin": "Allahu la ilaha illa huwal hayyul qayyum",
+      "arti": "Allah, tidak ada Tuhan selain Dia, Yang Maha Hidup, Yang terus menerus mengurus makhluk-Nya.",
+      "link_sumber": "QS. Al-Baqarah: 255"
+    }
+  ]
+}
